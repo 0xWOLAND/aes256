@@ -121,6 +121,7 @@ class AES:
                          ^ self.round_keys[i - 1][j]
                     self.round_keys[i].append(byte)
 
+        print(f'round_keys: {self.round_keys}')
         # print self.round_keys
 
     def encrypt(self, plaintext):
@@ -166,9 +167,15 @@ class AES:
 
     def __round_encrypt(self, state_matrix, key_matrix):
         self.__sub_bytes(state_matrix)
+        print("After sub_bytes:", state_matrix)
         self.__shift_rows(state_matrix)
+        print("After shift_rows:", state_matrix)
         self.__mix_columns(state_matrix)
+        print("After mix_columns:", state_matrix)
+        print(f'[ROUND_ENCRYPT] state_matrix: {state_matrix}')
+        print(f'[ROUND_ENCRYPT] key_matrix: {key_matrix}')
         self.__add_round_key(state_matrix, key_matrix)
+        print("After add_round_key:", state_matrix)
 
 
     def __round_decrypt(self, state_matrix, key_matrix):
@@ -229,12 +236,6 @@ class AES:
 
 
 if __name__ == "__main__":
-    # aes = AES(0x2b)
-    # print(hex(aes.encrypt(0x3243f6a8885a308d313198a2e0370734)))
-    # print(hex(aes.decrypt(0x3925841d02dc09fbdc118597196a0b32)))
-
-    pt = 0x3243f6a8885a308d313198a2e0370734
-    mat = text2matrix(pt)
-    recovered = matrix2text(mat)
-    print(mat)
-    print(hex(recovered))
+    aes = AES(0x2b7e151628aed2a6abf7158809cf4f3c)
+    print(hex(aes.encrypt(0x3243f6a8885a308d313198a2e0370734)))
+    print(hex(aes.decrypt(0x3925841d02dc09fbdc118597196a0b32)))
