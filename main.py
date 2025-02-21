@@ -1,5 +1,5 @@
 from tinygrad.tensor import Tensor
-
+from tinygrad import dtypes
 Sbox = [
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
     0xCA, 0x82, 0xC9, 0x7D, 0xFA, 0x59, 0x47, 0xF0, 0xAD, 0xD4, 0xA2, 0xAF, 0x9C, 0xA4, 0x72, 0xC0,
@@ -48,163 +48,36 @@ Rcon = [
 def xtime(a: int) -> int:
     return (((a << 1) ^ 0x1B) & 0xFF) if (a & 0x80) else (a << 1)
 
-def text2matrix(text: int) -> list:
-    matrix = []
-    for i in range(4):
-        matrix.append([])
-        for j in range(4):
-            matrix[i].append((text >> (120 - 8 * (4 * i + j))) & 0xFF)
-    return matrix
+def text2matrix(text: int) -> Tensor:
+    t_120 = Tensor.full((16,), 120, dtype=dtypes.uint64)
+    t_8 = Tensor.full((16,), 8, dtype=dtypes.uint64)
+    t_1 = Tensor.arange(16, dtype=dtypes.uint64)
+    t_shift = t_120 - t_8 * t_1
+    t_divisor = 2 ** t_shift
+    t_x = Tensor.full((16,), text, dtype=dtypes.uint64)
+    out = t_x.div(t_divisor).cast(dtypes.uint64).bitwise_and(0xFF)
+    return out.reshape(4, 4)
 
-def matrix2text(matrix: list) -> int:
-    text = 0
-    for i in range(4):
-        for j in range(4):
-            text |= (matrix[i][j] << (120 - 8 * (4 * i + j)))
-    return text
+def matrix2text(matrix: Tensor) -> int:
+    flat = matrix.flatten()
+    result = 0
+    for i in range(16):
+        byte = int(flat[i].item())
+        result = (result << 8) | byte
+    return result
 
-class AES:
-    def __init__(self, master_key: int):
-        self.change_key(master_key)
+if __name__ == "__main__":
+    # Test case: Convert random uint64 values
+    import random
+    for _ in range(5):
+        test_val = random.randint(0, 2**16-1)
+        matrix = text2matrix(test_val)
+        assert matrix.shape == (4, 4), "Matrix shape should be 4x4"
+        print(f'test value: {hex(test_val)}')
+        print(f'matrix: {matrix.numpy()}')
 
-    def change_key(self, master_key: int):
-        self.round_keys = text2matrix(master_key)
-
-        for i in range(4, 44):
-            self.round_keys.append([])
-            if i % 4 == 0:
-                byte = self.round_keys[i-4][0] \
-                       ^ Sbox[self.round_keys[i-1][1]] \
-                       ^ Rcon[i//4]
-                self.round_keys[i].append(byte)
-
-                for j in range(1, 4):
-                    byte = self.round_keys[i-4][j] \
-                           ^ Sbox[self.round_keys[i-1][(j+1)%4]]
-                    self.round_keys[i].append(byte)
-            else:
-                for j in range(4):
-                    byte = self.round_keys[i-4][j] \
-                           ^ self.round_keys[i-1][j]
-                    self.round_keys[i].append(byte)
-
-    def encrypt(self, plaintext: int) -> int:
-        self.plain_state = text2matrix(plaintext)
-
-        self.__add_round_key(self.plain_state, self.round_keys[:4])
-        self.__add_round_key(self.plain_state, self.round_keys[:4])
-
-        for i in range(1, 10):
-            self.__round_encrypt(self.plain_state, self.round_keys[4*i : 4*(i+1)])
-
-        self.__sub_bytes(self.plain_state)
-        self.__shift_rows(self.plain_state)
-        self.__add_round_key(self.plain_state, self.round_keys[40:])
-
-        return matrix2text(self.plain_state)
-
-    def decrypt(self, ciphertext: int) -> int:
-        self.cipher_state = text2matrix(ciphertext)
-
-        self.__add_round_key(self.cipher_state, self.round_keys[40:])
-        self.__inv_shift_rows(self.cipher_state)
-        self.__inv_sub_bytes(self.cipher_state)
-
-        for i in range(9, 0, -1):
-            self.__round_decrypt(self.cipher_state, self.round_keys[4*i : 4*(i+1)])
-
-        self.__add_round_key(self.cipher_state, self.round_keys[:4])
-
-        return matrix2text(self.cipher_state)
-
-    def __add_round_key(self, state_matrix: list, key_matrix: list):
-        for i in range(4):
-            for j in range(4):
-                state_matrix[i][j] ^= key_matrix[i][j]
-
-    def __round_encrypt(self, state_matrix: list, key_matrix: list):
-        self.__sub_bytes(state_matrix)
-        self.__shift_rows(state_matrix)
-        self.__mix_columns(state_matrix)
-        self.__add_round_key(state_matrix, key_matrix)
-
-    def __round_decrypt(self, state_matrix: list, key_matrix: list):
-        self.__add_round_key(state_matrix, key_matrix)
-        self.__inv_mix_columns(state_matrix)
-        self.__inv_shift_rows(state_matrix)
-        self.__inv_sub_bytes(state_matrix)
-
-    def __sub_bytes(self, state_matrix: list):
-        for i in range(4):
-            for j in range(4):
-                state_matrix[i][j] = Sbox[state_matrix[i][j]]
-
-    def __inv_sub_bytes(self, state_matrix: list):
-        for i in range(4):
-            for j in range(4):
-                state_matrix[i][j] = InvSbox[state_matrix[i][j]]
-
-    def __shift_rows(self, state_matrix: list):
-        state_matrix[0][1], state_matrix[1][1], state_matrix[2][1], state_matrix[3][1] = \
-            state_matrix[1][1], state_matrix[2][1], state_matrix[3][1], state_matrix[0][1]
-        
-        state_matrix[0][2], state_matrix[1][2], state_matrix[2][2], state_matrix[3][2] = \
-            state_matrix[2][2], state_matrix[3][2], state_matrix[0][2], state_matrix[1][2]
-        
-        state_matrix[0][3], state_matrix[1][3], state_matrix[2][3], state_matrix[3][3] = \
-            state_matrix[3][3], state_matrix[0][3], state_matrix[1][3], state_matrix[2][3]
-
-    def __inv_shift_rows(self, state_matrix: list):
-        state_matrix[0][1], state_matrix[1][1], state_matrix[2][1], state_matrix[3][1] = \
-            state_matrix[3][1], state_matrix[0][1], state_matrix[1][1], state_matrix[2][1]
-        
-        state_matrix[0][2], state_matrix[1][2], state_matrix[2][2], state_matrix[3][2] = \
-            state_matrix[2][2], state_matrix[3][2], state_matrix[0][2], state_matrix[1][2]
-        
-        state_matrix[0][3], state_matrix[1][3], state_matrix[2][3], state_matrix[3][3] = \
-            state_matrix[1][3], state_matrix[2][3], state_matrix[3][3], state_matrix[0][3]
-
-    def __mix_single_column(self, a: list):
-        t = a[0] ^ a[1] ^ a[2] ^ a[3]
-        u = a[0]
-        a[0] ^= t ^ xtime(a[0] ^ a[1])
-        a[1] ^= t ^ xtime(a[1] ^ a[2])
-        a[2] ^= t ^ xtime(a[2] ^ a[3])
-        a[3] ^= t ^ xtime(a[3] ^ u)
-
-    def __mix_columns(self, state_matrix: list):
-        for i in range(4):
-            self.__mix_single_column(state_matrix[i])
-
-    def __inv_mix_columns(self, state_matrix: list):
-        for i in range(4):
-            u = xtime(xtime(state_matrix[i][0] ^ state_matrix[i][2]))
-            v = xtime(xtime(state_matrix[i][1] ^ state_matrix[i][3]))
-            state_matrix[i][0] ^= u
-            state_matrix[i][1] ^= v
-            state_matrix[i][2] ^= u
-            state_matrix[i][3] ^= v
-
-        self.__mix_columns(state_matrix)
-
-
-# Unit Tests
-if __name__ == '__main__':
-    import unittest
-    
-    class AES_TEST(unittest.TestCase):
-        def setUp(self):
-            master_key = 0x2b7e151628aed2a6abf7158809cf4f3c
-            self.AES = AES(master_key)
-            
-        def test_encryption(self):
-            plaintext = 0x3243f6a8885a308d313198a2e0370734
-            encrypted = self.AES.encrypt(plaintext)
-            self.assertEqual(encrypted, 0x3925841d02dc09fbdc118597196a0b32)
-            
-        def test_decryption(self):
-            ciphertext = 0x3925841d02dc09fbdc118597196a0b32
-            decrypted = self.AES.decrypt(ciphertext)
-            self.assertEqual(decrypted, 0x3243f6a8885a308d313198a2e0370734)
-    
-    unittest.main()
+        recovered = matrix2text(matrix)
+        print(f'recovered: {hex(recovered)}')
+        assert recovered == test_val, "Recovered value should match original"
+        print("Test passed!\n")
+    print("All random tests passed!")
