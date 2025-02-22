@@ -25,7 +25,7 @@ jobs:
 
     - name: Install dependencies using uv
       run: |
-        uv pip install 
+        uv pip install --requirements pyproject.toml
 
     - name: Run tests with uv
       run: |
