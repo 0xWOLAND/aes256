@@ -122,17 +122,17 @@ class AES:
 
 
     def __inv_mix_columns(self, s: Tensor) -> Tensor:
-        even_cols = s[:, [0,2]]  
-        odd_cols = s[:, [1,3]]   
-        
-        u = xtime(xtime(even_cols[:,0].xor(even_cols[:,1])))
-        v = xtime(xtime(odd_cols[:,0].xor(odd_cols[:,1])))
-        
-        s[:, [0,2]] = s[:, [0,2]].xor(u.unsqueeze(1))
-        s[:, [1,3]] = s[:, [1,3]].xor(v.unsqueeze(1))
-        
-        self.__mix_columns(s)
+        u = xtime(xtime(s[:, 0].xor(s[:, 2])))
+        v = xtime(xtime(s[:, 1].xor(s[:, 3])))
 
+        _s = s.clone()
+        _s[:, 0] = s[:, 0].xor(u)
+        _s[:, 1] = s[:, 1].xor(v)
+        _s[:, 2] = s[:, 2].xor(u)
+        _s[:, 3] = s[:, 3].xor(v)
+
+        self.__mix_columns(_s)
+        s.assign(_s)
 
 if __name__ == "__main__":
     aes = AES(0x2B7E151628AED2A6ABF7158809CF4F3C)
