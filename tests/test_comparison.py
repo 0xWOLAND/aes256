@@ -1,7 +1,7 @@
 import pytest
 import random
-from reference_aes import AES as ReferenceAES
-from aes import AES as TinyGradAES
+from .reference.aes import AES as ReferenceAES
+from aes256.aes import AES as TinyGradAES
 
 
 def generate_random_128bit():

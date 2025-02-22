@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from constants import Sbox, InvSbox, Rcon
+from aes256.constants import Sbox, InvSbox, Rcon
 
 
 """

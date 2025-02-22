@@ -1,8 +1,9 @@
 import pytest
-from aes import AES as TinyGradAES
-from reference_aes import AES as ReferenceAES
+from aes256.aes import AES as TinyGradAES
+from tests.reference.aes import AES as ReferenceAES
 
 
+@pytest.mark.benchmark
 @pytest.mark.parametrize("num_ops", [2, 4, 8])
 @pytest.mark.parametrize(
     "aes_class", [TinyGradAES, ReferenceAES], ids=["TinyGradAES", "ReferenceAES"]
