@@ -201,12 +201,11 @@ class AES:
 
     @timing_decorator
     def __inv_shift_rows(self, s: Tensor) -> Tensor:
-        state = s.clone()
-
+        _s = s.contiguous()
         for i in range(1, 4):
-            state[:, i] = state[:, i].roll(i, dims=0)
+            _s[:, i] = _s[:, i].roll(i, dims=0)
 
-        s.assign(state)
+        s.assign(_s)
 
     @timing_decorator
     def __mix_columns(self, state: Tensor) -> Tensor:
