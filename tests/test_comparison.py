@@ -3,8 +3,10 @@ import random
 from reference_aes import AES as ReferenceAES
 from aes import AES as TinyGradAES
 
+
 def generate_random_128bit():
     return random.getrandbits(128)
+
 
 class TestAESImplementations:
     def setup_method(self):
@@ -22,7 +24,7 @@ class TestAESImplementations:
         ref_ciphertext = self.ref_aes.encrypt(self.plaintext)
         tiny_decrypted = self.tiny_aes.decrypt(ref_ciphertext)
         assert tiny_decrypted == self.plaintext
-        
+
         tiny_ciphertext = self.tiny_aes.encrypt(self.plaintext)
         ref_decrypted = self.ref_aes.decrypt(tiny_ciphertext)
         assert ref_decrypted == self.plaintext
@@ -33,10 +35,11 @@ class TestAESImplementations:
             ref_ciphertext = self.ref_aes.encrypt(plaintext)
             tiny_ciphertext = self.tiny_aes.encrypt(plaintext)
             assert ref_ciphertext == tiny_ciphertext
-            
+
             ref_decrypted = self.ref_aes.decrypt(tiny_ciphertext)
             tiny_decrypted = self.tiny_aes.decrypt(ref_ciphertext)
             assert ref_decrypted == plaintext and tiny_decrypted == plaintext
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
