@@ -74,29 +74,16 @@ def timing_decorator(func):
         return result
     return wrapper
 
-@timing_decorator
-def xtime(a: int) -> int:
-    return (((a << 1) ^ 0x1B) & 0xFF) if (a & 0x80) else (a << 1)
-
 
 @timing_decorator
-def xtime_tensor(a: Tensor) -> Tensor:
-    high_bit_mask = a.bitwise_and(0x80)
+def xtime(a: Tensor) -> Tensor:
     shifted = a.lshift(1)
-
-    condition = high_bit_mask != 0
-    result = condition.where(shifted.xor(0x1B), shifted)
-
-    return result.bitwise_and(0xFF)
+    return (a.bitwise_and(0x80) != 0).where(shifted.xor(0x1B), shifted).cast(dtypes.uint8)
 
 
 @timing_decorator
 def text2matrix(text: int) -> Tensor:
-    return (
-        Tensor([text >> (8 * (15 - i)) for i in range(16)], dtype=dtypes.uint8)
-        .bitwise_and(0xFF)
-        .reshape((4, 4))
-    )
+    return Tensor([text >> (8 * (15 - i)) for i in range(16)], dtype=dtypes.uint8).reshape((4, 4))
 
 
 @timing_decorator
@@ -210,14 +197,14 @@ class AES:
     @timing_decorator
     def __mix_columns(self, s: Tensor) -> Tensor:
         t = s[:, 0].xor(s[:, 1]).xor(s[:, 2]).xor(s[:, 3])
-        xtimes = xtime_tensor(s.roll(-1, dims=1).xor(s)).contiguous()
+        xtimes = xtime(s.roll(-1, dims=1).xor(s)).contiguous()
         s.assign(s.xor(t.unsqueeze(1)).xor(xtimes))
 
 
     @timing_decorator
     def __inv_mix_columns(self, state: Tensor) -> Tensor:
-        u = xtime_tensor(xtime_tensor(state[:, 0].xor(state[:, 2])))
-        v = xtime_tensor(xtime_tensor(state[:, 1].xor(state[:, 3])))
+        u = xtime(xtime(state[:, 0].xor(state[:, 2])))
+        v = xtime(xtime(state[:, 1].xor(state[:, 3])))
 
         out = state.clone()
         out[:, 0] = state[:, 0].xor(u)
