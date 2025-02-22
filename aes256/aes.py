@@ -166,7 +166,7 @@ class AES:
     def __round_encrypt(self, state_matrix: Tensor, key_matrix: Tensor) -> Tensor:
         self.__sub_bytes(state_matrix)
         state_matrix = self.__shift_rows(state_matrix)
-        state_matrix = self.__mix_columns(state_matrix)
+        self.__mix_columns(state_matrix)
         self.__add_round_key(state_matrix, key_matrix)
         return state_matrix
 
@@ -208,12 +208,11 @@ class AES:
         s.assign(_s)
 
     @timing_decorator
-    def __mix_columns(self, state: Tensor) -> Tensor:
-        t = state[:, 0].xor(state[:, 1]).xor(state[:, 2]).xor(state[:, 3])
-        xtimes = xtime_tensor(state.roll(-1, dims=1).xor(state))
-        state = state.xor(t.unsqueeze(1)).xor(xtimes)
+    def __mix_columns(self, s: Tensor) -> Tensor:
+        t = s[:, 0].xor(s[:, 1]).xor(s[:, 2]).xor(s[:, 3])
+        xtimes = xtime_tensor(s.roll(-1, dims=1).xor(s)).contiguous()
+        s.assign(s.xor(t.unsqueeze(1)).xor(xtimes))
 
-        return state
 
     @timing_decorator
     def __inv_mix_columns(self, state: Tensor) -> Tensor:
@@ -226,7 +225,8 @@ class AES:
         out[:, 2] = state[:, 2].xor(u)
         out[:, 3] = state[:, 3].xor(v)
 
-        return self.__mix_columns(out)
+        self.__mix_columns(out)
+        return out
 
 
 if __name__ == "__main__":
