@@ -169,5 +169,12 @@ class AES:
 
 if __name__ == "__main__":
     aes = AES(0x2B7E151628AED2A6ABF7158809CF4F3C)
-    print(hex(aes.encrypt(0x3243F6A8885A308D313198A2E0370734)))
-    print(hex(aes.decrypt(0x3925841D02DC09FBDC118597196A0B32)))
+    pt = 0x3243F6A8885A308D313198A2E0370734
+    ct = aes.encrypt(pt)
+    rec_pt = aes.decrypt(ct)
+    print(f'pt: {hex(pt)}')
+    print(f'ct: {hex(ct)}')
+    print(f'rec_pt: {hex(rec_pt)}')
+
+    assert pt == rec_pt
+
