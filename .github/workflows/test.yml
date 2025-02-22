@@ -10,33 +10,16 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-    env:
-      UV_SYSTEM_PYTHON: 1  # Allows `uv` to install dependencies globally
-
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Install uv
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.local/bin" >> $GITHUB_PATH  # Ensure `uv` is in PATH
-
-    - name: Set up caching for uv
-      uses: actions/cache@v3
+      uses: astral-sh/setup-uv@v5
       with:
-        path: .uv-cache
-        key: uv-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
-        restore-keys: |
-          uv-${{ runner.os }}-
+        enable-cache: true
 
-    - name: Install dependencies using uv
-      run: |
-        uv pip install --system --requirements pyproject.toml  # Install from pyproject.toml with system Python
+    - name: Install dependencies
+      run: uv sync --all-extras --dev
 
-    - name: Run tests with uv
-      run: |
-        pytest tests/
-
-    - name: Clean up uv cache
-      run: |
-        uv cache prune --ci  # Reduce cache size after the job
+    - name: Run tests
+      run: uv run pytest tests/
