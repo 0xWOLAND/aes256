@@ -93,7 +93,7 @@ def xtime_tensor(a: Tensor) -> Tensor:
 @timing_decorator
 def text2matrix(text: int) -> Tensor:
     return (
-        Tensor([text >> (8 * (15 - i)) for i in range(16)], dtype=dtypes.uint64)
+        Tensor([text >> (8 * (15 - i)) for i in range(16)], dtype=dtypes.uint8)
         .bitwise_and(0xFF)
         .reshape((4, 4))
     )
@@ -134,63 +134,61 @@ class AES:
     @timing_decorator
     def encrypt(self, plaintext: int) -> int:
         self.plain_state = text2matrix(plaintext)
-        self.plain_state = self.__add_round_key(self.plain_state, self.round_keys[:4])
+        self.__add_round_key(self.plain_state, self.round_keys[:4])
 
         for i in range(1, 10):
             self.plain_state = self.__round_encrypt(
                 self.plain_state, self.round_keys[4 * i : 4 * (i + 1)]
             )
 
-        self.plain_state = self.__sub_bytes(self.plain_state)
+        self.__sub_bytes(self.plain_state)
         self.plain_state = self.__shift_rows(self.plain_state)
-        self.plain_state = self.__add_round_key(self.plain_state, self.round_keys[40:])
+        self.__add_round_key(self.plain_state, self.round_keys[40:])
 
         return matrix2text(self.plain_state)
 
     @timing_decorator
     def decrypt(self, ciphertext: int) -> int:
         self.cipher_state = text2matrix(ciphertext)
-        self.cipher_state = self.__add_round_key(
-            self.cipher_state, self.round_keys[40:]
-        )
-        self.cipher_state = self.__inv_shift_rows(self.cipher_state)
-        self.cipher_state = self.__inv_sub_bytes(self.cipher_state)
+        self.__add_round_key(self.cipher_state, self.round_keys[40:])
+        self.__inv_shift_rows(self.cipher_state)
+        self.__inv_sub_bytes(self.cipher_state)
         for i in range(9, 0, -1):
             self.cipher_state = self.__round_decrypt(
                 self.cipher_state, self.round_keys[4 * i : 4 * (i + 1)]
             )
 
-        self.cipher_state = self.__add_round_key(self.cipher_state, self.round_keys[:4])
+        self.__add_round_key(self.cipher_state, self.round_keys[:4])
 
         return matrix2text(self.cipher_state)
 
     @timing_decorator
     def __round_encrypt(self, state_matrix: Tensor, key_matrix: Tensor) -> Tensor:
-        state_matrix = self.__sub_bytes(state_matrix)
+        self.__sub_bytes(state_matrix)
         state_matrix = self.__shift_rows(state_matrix)
         state_matrix = self.__mix_columns(state_matrix)
-        state_matrix = self.__add_round_key(state_matrix, key_matrix)
+        self.__add_round_key(state_matrix, key_matrix)
         return state_matrix
 
     @timing_decorator
     def __round_decrypt(self, state_matrix: Tensor, key_matrix: Tensor) -> Tensor:
-        state_matrix = self.__add_round_key(state_matrix, key_matrix)
+        self.__add_round_key(state_matrix, key_matrix)
         state_matrix = self.__inv_mix_columns(state_matrix)
-        state_matrix = self.__inv_shift_rows(state_matrix)
-        state_matrix = self.__inv_sub_bytes(state_matrix)
+        self.__inv_shift_rows(state_matrix)
+        self.__inv_sub_bytes(state_matrix)
         return state_matrix
 
     @timing_decorator
     def __add_round_key(self, s: Tensor, k: Tensor) -> Tensor:
-        return s.xor(k)
+        s.assign(s.xor(k))
 
     @timing_decorator
     def __sub_bytes(self, s: Tensor) -> Tensor:
-        return Sbox[s]
+        s.assign(Sbox[s])
 
     @timing_decorator
     def __inv_sub_bytes(self, s: Tensor) -> Tensor:
-        return InvSbox[s]
+        s.assign(InvSbox[s])
 
     @timing_decorator
     def __shift_rows(self, s: Tensor) -> Tensor:
@@ -208,7 +206,7 @@ class AES:
         for i in range(1, 4):
             state[:, i] = state[:, i].roll(i, dims=0)
 
-        return state
+        s.assign(state)
 
     @timing_decorator
     def __mix_columns(self, state: Tensor) -> Tensor:
