@@ -1,29 +1,7 @@
-#!/usr/bin/env python
+from tinygrad.tensor import Tensor
+from tinygrad import dtypes
 
-
-"""
-    Copyright (C) 2012 Bo Zhu http://about.bozhu.me
-
-    Permission is hereby granted, free of charge, to any person obtaining a
-    copy of this software and associated documentation files (the "Software"),
-    to deal in the Software without restriction, including without limitation
-    the rights to use, copy, modify, merge, publish, distribute, sublicense,
-    and/or sell copies of the Software, and to permit persons to whom the
-    Software is furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in
-    all copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-    DEALINGS IN THE SOFTWARE.
-"""
-
-Sbox = (
+Sbox = Tensor([
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
     0xCA, 0x82, 0xC9, 0x7D, 0xFA, 0x59, 0x47, 0xF0, 0xAD, 0xD4, 0xA2, 0xAF, 0x9C, 0xA4, 0x72, 0xC0,
     0xB7, 0xFD, 0x93, 0x26, 0x36, 0x3F, 0xF7, 0xCC, 0x34, 0xA5, 0xE5, 0xF1, 0x71, 0xD8, 0x31, 0x15,
@@ -40,9 +18,10 @@ Sbox = (
     0x70, 0x3E, 0xB5, 0x66, 0x48, 0x03, 0xF6, 0x0E, 0x61, 0x35, 0x57, 0xB9, 0x86, 0xC1, 0x1D, 0x9E,
     0xE1, 0xF8, 0x98, 0x11, 0x69, 0xD9, 0x8E, 0x94, 0x9B, 0x1E, 0x87, 0xE9, 0xCE, 0x55, 0x28, 0xDF,
     0x8C, 0xA1, 0x89, 0x0D, 0xBF, 0xE6, 0x42, 0x68, 0x41, 0x99, 0x2D, 0x0F, 0xB0, 0x54, 0xBB, 0x16,
-)
+], dtype=dtypes.uint8)
 
-InvSbox = (
+
+InvSbox = Tensor([
     0x52, 0x09, 0x6A, 0xD5, 0x30, 0x36, 0xA5, 0x38, 0xBF, 0x40, 0xA3, 0x9E, 0x81, 0xF3, 0xD7, 0xFB,
     0x7C, 0xE3, 0x39, 0x82, 0x9B, 0x2F, 0xFF, 0x87, 0x34, 0x8E, 0x43, 0x44, 0xC4, 0xDE, 0xE9, 0xCB,
     0x54, 0x7B, 0x94, 0x32, 0xA6, 0xC2, 0x23, 0x3D, 0xEE, 0x4C, 0x95, 0x0B, 0x42, 0xFA, 0xC3, 0x4E,
@@ -59,160 +38,148 @@ InvSbox = (
     0x60, 0x51, 0x7F, 0xA9, 0x19, 0xB5, 0x4A, 0x0D, 0x2D, 0xE5, 0x7A, 0x9F, 0x93, 0xC9, 0x9C, 0xEF,
     0xA0, 0xE0, 0x3B, 0x4D, 0xAE, 0x2A, 0xF5, 0xB0, 0xC8, 0xEB, 0xBB, 0x3C, 0x83, 0x53, 0x99, 0x61,
     0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D,
-)
+], dtype=dtypes.uint8)
 
-
-# learnt from http://cs.ucsb.edu/~koc/cs178/projects/JT/aes.c
-xtime = lambda a: (((a << 1) ^ 0x1B) & 0xFF) if (a & 0x80) else (a << 1)
-
-
-Rcon = (
+Rcon = Tensor([
     0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40,
     0x80, 0x1B, 0x36, 0x6C, 0xD8, 0xAB, 0x4D, 0x9A,
     0x2F, 0x5E, 0xBC, 0x63, 0xC6, 0x97, 0x35, 0x6A,
     0xD4, 0xB3, 0x7D, 0xFA, 0xEF, 0xC5, 0x91, 0x39,
-)
+], dtype=dtypes.uint8)
+    
+
+def xtime(a: int) -> int:
+    return (((a << 1) ^ 0x1B) & 0xFF) if (a & 0x80) else (a << 1)
+
+def xtime_tensor(a: Tensor) -> Tensor:
+    high_bit_mask = a.bitwise_and(0x80)
+    shifted = a.lshift(1)
+    
+    condition = high_bit_mask != 0
+    result = condition.where(
+        shifted.xor(0x1B), 
+        shifted            
+    )
+    
+    return result.bitwise_and(0xFF)
 
 
-def text2matrix(text):
-    matrix = []
+def text2matrix(text: int) -> Tensor:
+    return (Tensor([text >> (8 * (15 - i)) for i in range(16)], 
+                   dtype=dtypes.uint64)
+            .bitwise_and(0xFF)
+            .reshape((4, 4)))
+
+def matrix2text(matrix: Tensor) -> int:
+    flat = matrix.flatten()
+    result = 0
     for i in range(16):
-        byte = (text >> (8 * (15 - i))) & 0xFF
-        if i % 4 == 0:
-            matrix.append([byte])
-        else:
-            matrix[i // 4].append(byte)
-    return matrix
-
-
-def matrix2text(matrix):
-    text = 0
-    for i in range(4):
-        for j in range(4):
-            text |= (matrix[i][j] << (120 - 8 * (4 * i + j)))
-    return text
-
+        byte = int(flat[i].item())
+        result = (result << 8) | byte
+    return result
 
 class AES:
     def __init__(self, master_key):
         self.change_key(master_key)
 
     def change_key(self, master_key):
-        self.round_keys = text2matrix(master_key)
-
+        self.round_keys = Tensor.zeros((44, 4), dtype=dtypes.uint8).contiguous()
+        self.round_keys[:4] = text2matrix(master_key)
         for i in range(4, 4 * 11):
-            self.round_keys.append([])
             if i % 4 == 0:
-                byte = self.round_keys[i - 4][0]        \
-                     ^ Sbox[self.round_keys[i - 1][1]]  \
-                     ^ Rcon[i // 4]
-                self.round_keys[i].append(byte)
-
-                for j in range(1, 4):
-                    byte = self.round_keys[i - 4][j]    \
-                         ^ Sbox[self.round_keys[i - 1][(j + 1) % 4]]
-                    self.round_keys[i].append(byte)
+                self.round_keys[i, 0] = (self.round_keys[i-4, 0] ^
+                                        Sbox[self.round_keys[i-1, 1].item()] ^
+                                        Rcon[i//4].item())
+                
+                shifted_indices = Tensor([2,3,0], dtype=dtypes.uint8)
+                sboxed = Sbox[self.round_keys[i-1][shifted_indices]]
+                self.round_keys[i, 1:] = self.round_keys[i-4, 1:].xor(sboxed)
             else:
-                for j in range(4):
-                    byte = self.round_keys[i - 4][j]    \
-                         ^ self.round_keys[i - 1][j]
-                    self.round_keys[i].append(byte)
-
-    def encrypt(self, plaintext):
+                self.round_keys[i] = self.round_keys[i-4].xor(self.round_keys[i-1])
+    
+    def encrypt(self, plaintext: int) -> int:
         self.plain_state = text2matrix(plaintext)
-
-        self.__add_round_key(self.plain_state, self.round_keys[:4])
+        self.plain_state = self.__add_round_key(self.plain_state, self.round_keys[:4])
 
         for i in range(1, 10):
-            self.__round_encrypt(self.plain_state, self.round_keys[4 * i : 4 * (i + 1)])
+            self.plain_state = self.__round_encrypt(self.plain_state, self.round_keys[4 * i : 4 * (i + 1)])
 
-        self.__sub_bytes(self.plain_state)
-        self.__shift_rows(self.plain_state)
-        self.__add_round_key(self.plain_state, self.round_keys[40:])
+        self.plain_state = self.__sub_bytes(self.plain_state)
+        self.plain_state = self.__shift_rows(self.plain_state)
+        self.plain_state = self.__add_round_key(self.plain_state, self.round_keys[40:])
 
         return matrix2text(self.plain_state)
 
-    def decrypt(self, ciphertext):
+    def decrypt(self, ciphertext: int) -> int:
         self.cipher_state = text2matrix(ciphertext)
-
-        self.__add_round_key(self.cipher_state, self.round_keys[40:])
-        self.__inv_shift_rows(self.cipher_state)
-        self.__inv_sub_bytes(self.cipher_state)
-
+        self.cipher_state = self.__add_round_key(self.cipher_state, self.round_keys[40:])
+        self.cipher_state = self.__inv_shift_rows(self.cipher_state)
+        self.cipher_state = self.__inv_sub_bytes(self.cipher_state)
         for i in range(9, 0, -1):
-            self.__round_decrypt(self.cipher_state, self.round_keys[4 * i : 4 * (i + 1)])
+            self.cipher_state = self.__round_decrypt(self.cipher_state, self.round_keys[4 * i : 4 * (i + 1)])
 
-        self.__add_round_key(self.cipher_state, self.round_keys[:4])
+        self.cipher_state = self.__add_round_key(self.cipher_state, self.round_keys[:4])
 
         return matrix2text(self.cipher_state)
+            
 
-    def __add_round_key(self, s, k):
-        for i in range(4):
-            for j in range(4):
-                s[i][j] ^= k[i][j]
+    def __round_encrypt(self, state_matrix: Tensor, key_matrix: Tensor) -> Tensor:
+        state_matrix = self.__sub_bytes(state_matrix)
+        state_matrix = self.__shift_rows(state_matrix)
+        state_matrix = self.__mix_columns(state_matrix)
+        state_matrix = self.__add_round_key(state_matrix, key_matrix)
+        return state_matrix
 
+    def __round_decrypt(self, state_matrix: Tensor, key_matrix: Tensor) -> Tensor:
+        state_matrix = self.__add_round_key(state_matrix, key_matrix)
+        state_matrix = self.__inv_mix_columns(state_matrix)
+        state_matrix = self.__inv_shift_rows(state_matrix)
+        state_matrix = self.__inv_sub_bytes(state_matrix)
+        return state_matrix
 
-    def __round_encrypt(self, state_matrix, key_matrix):
-        self.__sub_bytes(state_matrix)
-        self.__shift_rows(state_matrix)
-        self.__mix_columns(state_matrix)
-        self.__add_round_key(state_matrix, key_matrix)
+    def __add_round_key(self, s: Tensor, k: Tensor) -> Tensor:
+        return s.xor(k)
+    
+    def __sub_bytes(self, s: Tensor) -> Tensor:
+        return Sbox[s]
+    
+    def __inv_sub_bytes(self, s: Tensor) -> Tensor:
+        return InvSbox[s]
+    
+    def __shift_rows(self, s: Tensor) -> Tensor:
+        state = s.clone()
 
-    def __round_decrypt(self, state_matrix, key_matrix):
-        self.__add_round_key(state_matrix, key_matrix)
-        self.__inv_mix_columns(state_matrix)
-        self.__inv_shift_rows(state_matrix)
-        self.__inv_sub_bytes(state_matrix)
+        for i in range(1, 4):
+            state[:, i] = state[:, i].roll(-i, dims=0)
+        
+        return state
 
-    def __sub_bytes(self, s):
-        for i in range(4):
-            for j in range(4):
-                s[i][j] = Sbox[s[i][j]]
+    def __inv_shift_rows(self, s: Tensor) -> Tensor:
+        state = s.clone()
 
+        for i in range(1, 4):
+            state[:, i] = state[:, i].roll(i, dims=0)
+        
+        return state
 
-    def __inv_sub_bytes(self, s):
-        for i in range(4):
-            for j in range(4):
-                s[i][j] = InvSbox[s[i][j]]
+    def __mix_columns(self, state: Tensor) -> Tensor:
+        t = state[:, 0].xor(state[:, 1]).xor(state[:, 2]).xor(state[:, 3])
+        xtimes = xtime_tensor(state.roll(-1, dims=1).xor(state))
+        state = state.xor(t.unsqueeze(1)).xor(xtimes)
 
-
-    def __shift_rows(self, s):
-        s[0][1], s[1][1], s[2][1], s[3][1] = s[1][1], s[2][1], s[3][1], s[0][1]
-        s[0][2], s[1][2], s[2][2], s[3][2] = s[2][2], s[3][2], s[0][2], s[1][2]
-        s[0][3], s[1][3], s[2][3], s[3][3] = s[3][3], s[0][3], s[1][3], s[2][3]
-
-
-    def __inv_shift_rows(self, s):
-        s[0][1], s[1][1], s[2][1], s[3][1] = s[3][1], s[0][1], s[1][1], s[2][1]
-        s[0][2], s[1][2], s[2][2], s[3][2] = s[2][2], s[3][2], s[0][2], s[1][2]
-        s[0][3], s[1][3], s[2][3], s[3][3] = s[1][3], s[2][3], s[3][3], s[0][3]
-
-    def __mix_single_column(self, a):
-        # please see Sec 4.1.2 in The Design of Rijndael
-        t = a[0] ^ a[1] ^ a[2] ^ a[3]
-        u = a[0]
-        a[0] ^= t ^ xtime(a[0] ^ a[1])
-        a[1] ^= t ^ xtime(a[1] ^ a[2])
-        a[2] ^= t ^ xtime(a[2] ^ a[3])
-        a[3] ^= t ^ xtime(a[3] ^ u)
-
-
-    def __mix_columns(self, s):
-        for i in range(4):
-            self.__mix_single_column(s[i])
-
-
-    def __inv_mix_columns(self, s):
-        for i in range(4):
-            u = xtime(xtime(s[i][0] ^ s[i][2]))
-            v = xtime(xtime(s[i][1] ^ s[i][3]))
-            s[i][0] ^= u
-            s[i][1] ^= v
-            s[i][2] ^= u
-            s[i][3] ^= v
-
-        self.__mix_columns(s)
-
+        return state
+            
+    def __inv_mix_columns(self, state: Tensor) -> Tensor:
+        u = xtime_tensor(xtime_tensor(state[:, 0].xor(state[:, 2])))
+        v = xtime_tensor(xtime_tensor(state[:, 1].xor(state[:, 3])))
+        
+        out = state.clone()
+        out[:, 0] = state[:, 0].xor(u)
+        out[:, 1] = state[:, 1].xor(v)
+        out[:, 2] = state[:, 2].xor(u)
+        out[:, 3] = state[:, 3].xor(v)
+        
+        return self.__mix_columns(out)
 
 if __name__ == "__main__":
     aes = AES(0x2b7e151628aed2a6abf7158809cf4f3c)
