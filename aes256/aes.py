@@ -124,12 +124,12 @@ class AES:
         self.__add_round_key(self.plain_state, self.round_keys[:4])
 
         for i in range(1, 10):
-            self.plain_state = self.__round_encrypt(
+            self.__round_encrypt(
                 self.plain_state, self.round_keys[4 * i : 4 * (i + 1)]
             )
 
         self.__sub_bytes(self.plain_state)
-        self.plain_state = self.__shift_rows(self.plain_state)
+        self.__shift_rows(self.plain_state)
         self.__add_round_key(self.plain_state, self.round_keys[40:])
 
         return matrix2text(self.plain_state)
@@ -152,10 +152,10 @@ class AES:
     @timing_decorator
     def __round_encrypt(self, state_matrix: Tensor, key_matrix: Tensor) -> Tensor:
         self.__sub_bytes(state_matrix)
-        state_matrix = self.__shift_rows(state_matrix)
+        self.__shift_rows(state_matrix)
         self.__mix_columns(state_matrix)
         self.__add_round_key(state_matrix, key_matrix)
-        return state_matrix
+
 
     @timing_decorator
     def __round_decrypt(self, state_matrix: Tensor, key_matrix: Tensor) -> Tensor:
@@ -178,16 +178,16 @@ class AES:
 
     @timing_decorator
     def __shift_rows(self, s: Tensor) -> Tensor:
-        state = s.clone()
-
+        _s = s
         for i in range(1, 4):
-            state[:, i] = state[:, i].roll(-i, dims=0)
+            _s[:, i] = _s[:, i].roll(-i, dims=0)
 
-        return state
+        s.assign(_s)
+
 
     @timing_decorator
     def __inv_shift_rows(self, s: Tensor) -> Tensor:
-        _s = s.contiguous()
+        _s = s
         for i in range(1, 4):
             _s[:, i] = _s[:, i].roll(i, dims=0)
 
