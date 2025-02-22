@@ -16,7 +16,7 @@ uv run pytest
 
 Run benchmarks:
  ```bash
-uv run pytest tests/bench.py
+uv run pytest bench.py
 ```
 
 ## Benchmark Results
