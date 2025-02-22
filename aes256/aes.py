@@ -241,3 +241,4 @@ if __name__ == "__main__":
     print(f'ct: {hex(ct)}')
     print(f'rec_pt: {hex(rec_pt)}')
 
+    assert pt == rec_pt
