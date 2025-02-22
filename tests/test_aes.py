@@ -1,5 +1,5 @@
 import pytest
-from aes import AES
+from aes256.aes import AES
 
 
 class TestAESEncryptDecrypt:
