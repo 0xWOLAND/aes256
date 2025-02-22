@@ -75,7 +75,6 @@ Rcon = (
 
 
 def text2matrix(text):
-    print(f'text: {text}')
     matrix = []
     for i in range(16):
         byte = (text >> (8 * (15 - i))) & 0xFF
@@ -83,7 +82,6 @@ def text2matrix(text):
             matrix.append([byte])
         else:
             matrix[i // 4].append(byte)
-    print(f'matrix: {matrix}')
     return matrix
 
 
@@ -101,7 +99,6 @@ class AES:
 
     def change_key(self, master_key):
         self.round_keys = text2matrix(master_key)
-        # print self.round_keys
 
         for i in range(4, 4 * 11):
             self.round_keys.append([])
@@ -121,27 +118,17 @@ class AES:
                          ^ self.round_keys[i - 1][j]
                     self.round_keys[i].append(byte)
 
-        print(f'round_keys: {self.round_keys}')
-        # print self.round_keys
-
     def encrypt(self, plaintext):
-        print("Plaintext:", plaintext)
         self.plain_state = text2matrix(plaintext)
-        print("After text2matrix:", self.plain_state)
 
         self.__add_round_key(self.plain_state, self.round_keys[:4])
-        print("After initial add_round_key:", self.plain_state)
 
         for i in range(1, 10):
             self.__round_encrypt(self.plain_state, self.round_keys[4 * i : 4 * (i + 1)])
-            print(f"After round {i}:", self.plain_state)
 
         self.__sub_bytes(self.plain_state)
-        print("After final sub_bytes:", self.plain_state)
         self.__shift_rows(self.plain_state)
-        print("After final shift_rows:", self.plain_state)
         self.__add_round_key(self.plain_state, self.round_keys[40:])
-        print("After final add_round_key:", self.plain_state)
 
         return matrix2text(self.plain_state)
 
@@ -167,16 +154,9 @@ class AES:
 
     def __round_encrypt(self, state_matrix, key_matrix):
         self.__sub_bytes(state_matrix)
-        print("After sub_bytes:", state_matrix)
         self.__shift_rows(state_matrix)
-        print("After shift_rows:", state_matrix)
         self.__mix_columns(state_matrix)
-        print("After mix_columns:", state_matrix)
-        print(f'[ROUND_ENCRYPT] state_matrix: {state_matrix}')
-        print(f'[ROUND_ENCRYPT] key_matrix: {key_matrix}')
         self.__add_round_key(state_matrix, key_matrix)
-        print("After add_round_key:", state_matrix)
-
 
     def __round_decrypt(self, state_matrix, key_matrix):
         self.__add_round_key(state_matrix, key_matrix)
@@ -223,7 +203,6 @@ class AES:
 
 
     def __inv_mix_columns(self, s):
-        # see Sec 4.1.3 in The Design of Rijndael
         for i in range(4):
             u = xtime(xtime(s[i][0] ^ s[i][2]))
             v = xtime(xtime(s[i][1] ^ s[i][3]))

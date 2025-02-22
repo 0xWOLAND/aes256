@@ -90,63 +90,49 @@ class AES:
     def change_key(self, master_key):
         self.round_keys = Tensor.zeros((44, 4), dtype=dtypes.uint8).contiguous()
         self.round_keys[:4] = text2matrix(master_key)
-
         for i in range(4, 4 * 11):
             if i % 4 == 0:
-                self.round_keys[i, 0] = self.round_keys[i-4][0] ^ Sbox[self.round_keys[i-1][1]] ^ Rcon[i//4].item()
-                bytes = self.round_keys[i-4][1:].xor(Sbox[self.round_keys[i-1][1:].roll(-1, dims=0)])
-                self.round_keys[i, 1:] = bytes
+                self.round_keys[i, 0] = (self.round_keys[i-4, 0] ^
+                                        Sbox[self.round_keys[i-1, 1].item()] ^
+                                        Rcon[i//4].item())
+                
+                shifted_indices = Tensor([2,3,0], dtype=dtypes.uint8)
+                sboxed = Sbox[self.round_keys[i-1][shifted_indices]]
+                self.round_keys[i, 1:] = self.round_keys[i-4, 1:].xor(sboxed)
             else:
                 self.round_keys[i] = self.round_keys[i-4].xor(self.round_keys[i-1])
     
     def encrypt(self, plaintext: int) -> int:
-        print("Plaintext:", plaintext)
         self.plain_state = text2matrix(plaintext)
-        print("After text2matrix:", self.plain_state.numpy())
-        print(f'round_keys: {self.round_keys.numpy()}')
-
         self.plain_state = self.__add_round_key(self.plain_state, self.round_keys[:4])
-        print("After initial add_round_key:", self.plain_state.numpy())
 
         for i in range(1, 10):
             self.plain_state = self.__round_encrypt(self.plain_state, self.round_keys[4 * i : 4 * (i + 1)])
-            print(f"After round {i}:", self.plain_state.numpy())
 
         self.plain_state = self.__sub_bytes(self.plain_state)
-        print("After final sub_bytes:", self.plain_state.numpy())
         self.plain_state = self.__shift_rows(self.plain_state)
-        print("After final shift_rows:", self.plain_state.numpy())
         self.plain_state = self.__add_round_key(self.plain_state, self.round_keys[40:])
-        print("After final add_round_key:", self.plain_state.numpy())
 
         return matrix2text(self.plain_state)
 
     def decrypt(self, ciphertext: int) -> int:
         self.cipher_state = text2matrix(ciphertext)
-
-        self.cipher_state = self.__add_round_key(self.cipher_state, self.round_keys[:, 40:44])
+        self.cipher_state = self.__add_round_key(self.cipher_state, self.round_keys[40:])
         self.cipher_state = self.__inv_shift_rows(self.cipher_state)
         self.cipher_state = self.__inv_sub_bytes(self.cipher_state)
-
         for i in range(9, 0, -1):
-            self.cipher_state = self.__round_decrypt(self.cipher_state, self.round_keys[:, 4 * i : 4 * (i + 1)])
+            self.cipher_state = self.__round_decrypt(self.cipher_state, self.round_keys[4 * i : 4 * (i + 1)])
 
-        self.cipher_state = self.__add_round_key(self.cipher_state, self.round_keys[:, :4])
+        self.cipher_state = self.__add_round_key(self.cipher_state, self.round_keys[:4])
 
         return matrix2text(self.cipher_state)
             
 
     def __round_encrypt(self, state_matrix: Tensor, key_matrix: Tensor) -> Tensor:
         state_matrix = self.__sub_bytes(state_matrix)
-        print("After sub_bytes:", state_matrix.numpy())
         state_matrix = self.__shift_rows(state_matrix)
-        print("After shift_rows:", state_matrix.numpy())
         state_matrix = self.__mix_columns(state_matrix)
-        print("After mix_columns:", state_matrix.numpy())
-        print(f'[ADD_ROUND_KEY] state_matrix: {state_matrix.numpy()}')
-        print(f'[ADD_ROUND_KEY] key_matrix: {key_matrix.numpy()}')
         state_matrix = self.__add_round_key(state_matrix, key_matrix)
-        print("After add_round_key:", state_matrix.numpy())
         return state_matrix
 
     def __round_decrypt(self, state_matrix: Tensor, key_matrix: Tensor) -> Tensor:
@@ -169,7 +155,7 @@ class AES:
         state = s.clone()
 
         for i in range(1, 4):
-            state[i] = state[i].roll(-i, dims=0)
+            state[:, i] = state[:, i].roll(-i, dims=0)
         
         return state
 
@@ -177,28 +163,32 @@ class AES:
         state = s.clone()
 
         for i in range(1, 4):
-            state[i] = state[i].roll(i, dims=0)
+            state[:, i] = state[:, i].roll(i, dims=0)
         
         return state
 
     def __mix_columns(self, state: Tensor) -> Tensor:
-        t = state[0].xor(state[1]).xor(state[2]).xor(state[3])
+        t = state[:, 0].xor(state[:, 1]).xor(state[:, 2]).xor(state[:, 3])
         result = state.clone()
 
-        result[0] = state[0].xor(t).xor(xtime_tensor(state[0].xor(state[1])))
-        result[1] = state[1].xor(t).xor(xtime_tensor(state[1].xor(state[2])))
-        result[2] = state[2].xor(t).xor(xtime_tensor(state[2].xor(state[3])))
-        result[3] = state[3].xor(t).xor(xtime_tensor(state[3].xor(state[0])))
+        result[:, 0] = state[:, 0].xor(t).xor(xtime_tensor(state[:, 0].xor(state[:, 1])))
+        result[:, 1] = state[:, 1].xor(t).xor(xtime_tensor(state[:, 1].xor(state[:, 2])))
+        result[:, 2] = state[:, 2].xor(t).xor(xtime_tensor(state[:, 2].xor(state[:, 3])))
+        result[:, 3] = state[:, 3].xor(t).xor(xtime_tensor(state[:, 3].xor(state[:, 0])))
 
         return result
-    
+            
     def __inv_mix_columns(self, state: Tensor) -> Tensor:
-        u_v = xtime_tensor(xtime_tensor(
-            state[::2].xor(state[1::2])
-        )).repeat_interleave(2, dim=0)
+        u = xtime_tensor(xtime_tensor(state[:, 0].xor(state[:, 2])))
+        v = xtime_tensor(xtime_tensor(state[:, 1].xor(state[:, 3])))
         
-        state = state.xor(u_v)
-        return self.__mix_columns(state)
+        out = state.clone()
+        out[:, 0] = state[:, 0].xor(u)
+        out[:, 1] = state[:, 1].xor(v)
+        out[:, 2] = state[:, 2].xor(u)
+        out[:, 3] = state[:, 3].xor(v)
+        
+        return self.__mix_columns(out)
 
 if __name__ == "__main__":
     aes = AES(0x2b7e151628aed2a6abf7158809cf4f3c)
