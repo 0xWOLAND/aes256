@@ -2,6 +2,7 @@ import pytest
 from aes256.aes import AES as TinyGradAES
 from tests.reference.aes import AES as ReferenceAES
 
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize("num_ops", [2, 4, 8])
 @pytest.mark.parametrize(

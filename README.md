@@ -4,6 +4,11 @@ A TinyGrad-based implementation of the Advanced Encryption Standard (AES) algori
 
 ## Usage
 
+Install dependencies:
+```bash
+uv sync
+```
+
 Run tests: 
 ```bash
 uv run pytest

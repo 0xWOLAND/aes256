@@ -1,10 +1,15 @@
 from tinygrad.tensor import Tensor
 from tinygrad import dtypes
-from aes256.constants import Sbox as Sbox_const, InvSbox as InvSbox_const, Rcon as Rcon_const
+from aes256.constants import (
+    Sbox as Sbox_const,
+    InvSbox as InvSbox_const,
+    Rcon as Rcon_const,
+)
 
 Sbox = Tensor(Sbox_const, dtype=dtypes.uint8)
 InvSbox = Tensor(InvSbox_const, dtype=dtypes.uint8)
 Rcon = Tensor(Rcon_const, dtype=dtypes.uint8)
+
 
 def xtime(a: int) -> int:
     return (((a << 1) ^ 0x1B) & 0xFF) if (a & 0x80) else (a << 1)
