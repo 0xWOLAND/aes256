@@ -141,7 +141,7 @@ class AES:
         self.__inv_shift_rows(self.cipher_state)
         self.__inv_sub_bytes(self.cipher_state)
         for i in range(9, 0, -1):
-            self.cipher_state = self.__round_decrypt(
+            self.__round_decrypt(
                 self.cipher_state, self.round_keys[4 * i : 4 * (i + 1)]
             )
 
@@ -160,10 +160,9 @@ class AES:
     @timing_decorator
     def __round_decrypt(self, state_matrix: Tensor, key_matrix: Tensor) -> Tensor:
         self.__add_round_key(state_matrix, key_matrix)
-        state_matrix = self.__inv_mix_columns(state_matrix)
+        self.__inv_mix_columns(state_matrix)
         self.__inv_shift_rows(state_matrix)
         self.__inv_sub_bytes(state_matrix)
-        return state_matrix
 
     @timing_decorator
     def __add_round_key(self, s: Tensor, k: Tensor) -> Tensor:
@@ -202,18 +201,17 @@ class AES:
 
 
     @timing_decorator
-    def __inv_mix_columns(self, state: Tensor) -> Tensor:
-        u = xtime(xtime(state[:, 0].xor(state[:, 2])))
-        v = xtime(xtime(state[:, 1].xor(state[:, 3])))
-
-        out = state.clone()
-        out[:, 0] = state[:, 0].xor(u)
-        out[:, 1] = state[:, 1].xor(v)
-        out[:, 2] = state[:, 2].xor(u)
-        out[:, 3] = state[:, 3].xor(v)
-
-        self.__mix_columns(out)
-        return out
+    def __inv_mix_columns(self, s: Tensor) -> Tensor:
+        even_cols = s[:, [0,2]]  
+        odd_cols = s[:, [1,3]]   
+        
+        u = xtime(xtime(even_cols[:,0].xor(even_cols[:,1])))
+        v = xtime(xtime(odd_cols[:,0].xor(odd_cols[:,1])))
+        
+        s[:, [0,2]] = s[:, [0,2]].xor(u.unsqueeze(1))
+        s[:, [1,3]] = s[:, [1,3]].xor(v.unsqueeze(1))
+        
+        self.__mix_columns(s)
 
 
 if __name__ == "__main__":
